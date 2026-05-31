@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PitchRadar v6</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;500;700&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#0a0c10;--surface:#111520;--surface2:#1a2030;--border:#2a3550;
+  --accent:#00e5ff;--accent2:#ff6b35;--green:#39ff14;--text:#e8edf5;
+  --muted:#6b7a99;--danger:#ff3b5c;--warn:#f5c518;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03)1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:0 0 80px;}
+.nav-tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);}
+.nav-tab{flex:1;padding:11px 4px;background:none;border:none;color:var(--muted);font-size:11px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.page{display:none;}.page.active{display:block;}
+header{padding:14px 20px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(0,229,255,.05)0%,transparent 100%);}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:var(--accent);}
+.logo span{color:var(--accent2);}
+.version{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);border:1px solid var(--border);padding:3px 7px;border-radius:3px;}
+
+/* MEASURE BUTTON */
+.measure-top{padding:12px 14px 8px;}
+.btn-measure{width:100%;padding:20px 16px;border:none;border-radius:12px;font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:4px;cursor:pointer;transition:background .2s,border-color .2s,color .2s;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:14px;-webkit-tap-highlight-color:transparent;}
+.btn-measure.state-release{background:linear-gradient(135deg,#003a1a,#005025);color:var(--green);border:2px solid var(--green);box-shadow:0 0 28px rgba(57,255,20,.2);}
+.btn-measure.state-catch{background:linear-gradient(135deg,#3a0800,#550c00);color:var(--danger);border:2px solid var(--danger);box-shadow:0 0 28px rgba(255,59,92,.25);}
+.btn-measure:active{transform:scale(.97);}
+.btn-icon{font-size:34px;line-height:1;}
+.btn-sub{display:block;font-size:12px;letter-spacing:1px;margin-top:3px;opacity:.85;font-family:'Noto Sans JP',sans-serif;font-weight:500;}
+@keyframes flashGreen{0%{opacity:.5}100%{opacity:0}}
+@keyframes flashRed{0%{opacity:.5}100%{opacity:0}}
+.flash-green,.flash-red{position:absolute;inset:0;pointer-events:none;border-radius:10px;}
+.flash-green{background:var(--green);animation:flashGreen .25s ease-out forwards;}
+.flash-red{background:var(--danger);animation:flashRed .25s ease-out forwards;}
+.elapsed-bar{margin:0 14px 8px;padding:10px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:none;align-items:center;justify-content:space-between;}
+.elapsed-bar.visible{display:flex;}
+.elapsed-label{font-size:12px;color:var(--muted);}
+.elapsed-val{font-family:'Share Tech Mono',monospace;font-size:22px;color:var(--danger);}
+
+/* Camera */
+.camera-section{position:relative;background:#000;aspect-ratio:16/9;overflow:hidden;}
+video{width:100%;height:100%;object-fit:cover;display:block;}
+.corner-bracket{position:absolute;width:22px;height:22px;border-color:var(--accent);border-style:solid;opacity:.7;}
+.corner-bracket.tl{top:8px;left:8px;border-width:2px 0 0 2px;}
+.corner-bracket.tr{top:8px;right:8px;border-width:2px 2px 0 0;}
+.corner-bracket.bl{bottom:8px;left:8px;border-width:0 0 2px 2px;}
+.corner-bracket.br{bottom:8px;right:8px;border-width:0 2px 2px 0;}
+.cam-label{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);background:rgba(0,0,0,.6);padding:3px 8px;border-radius:2px;border:1px solid rgba(0,229,255,.3);white-space:nowrap;}
+.cam-status{position:absolute;bottom:8px;right:8px;font-family:'Share Tech Mono',monospace;font-size:10px;display:flex;align-items:center;gap:5px;color:var(--muted);}
+.cam-status .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);}
+.cam-status.live .dot{background:var(--green);animation:blink 1.2s infinite;}
+.cam-status.live{color:var(--green);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.cam-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--surface);}
+.cam-placeholder p{font-size:11px;color:var(--muted);text-align:center;line-height:1.7;}
+.cam-toggle-bar{padding:8px 14px;display:flex;gap:8px;}
+.btn-cam{flex:1;padding:10px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;cursor:pointer;transition:all .15s;border:1px solid;}
+.btn-cam-start{background:rgba(0,229,255,.08);color:var(--accent);border-color:var(--accent);}
+.btn-cam-stop{background:rgba(255,107,53,.08);color:var(--accent2);border-color:var(--accent2);display:none;}
+.btn-cam:active{transform:scale(.97);}
+
+/* Speed board */
+.speed-board{margin:0 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.speed-main{padding:14px 16px 10px;text-align:center;background:linear-gradient(180deg,rgba(0,229,255,.06)0%,transparent 100%);}
+.speed-number{font-family:'Bebas Neue',sans-serif;font-size:88px;line-height:1;color:var(--accent);letter-spacing:-2px;transition:color .3s;}
+.speed-number.fast{color:var(--accent2);}
+.speed-number.very-fast{color:var(--danger);}
+.speed-unit{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--muted);letter-spacing:4px;}
+.speed-meta{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);}
+.smi{padding:8px;text-align:center;border-right:1px solid var(--border);}
+.smi:last-child{border-right:none;}
+.smi-label{font-size:10px;color:var(--muted);display:block;margin-bottom:2px;}
+.smi-value{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text);}
+
+/* History */
+.history-wrap{margin:10px 14px 0;}
+.history-header{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 8px 0 0;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.history-stats{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--accent);}
+.history-list{list-style:none;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;}
+.history-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface);animation:slideIn .3s ease;}
+.history-item:last-child{border-bottom:none;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.h-num{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);width:18px;}
+.h-speed{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;color:var(--accent);width:48px;}
+.h-speed.fast{color:var(--accent2);}
+.h-speed.very-fast{color:var(--danger);}
+.h-kmh{font-size:10px;color:var(--muted);}
+.h-info{flex:1;font-size:10px;color:var(--muted);line-height:1.6;}
+.h-time{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);}
+
+/* Panel */
+.panel{margin:10px 14px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.panel-header{padding:8px 14px;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;justify-content:space-between;align-items:center;}
+.pitcher-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;}
+.pitcher-select{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:'Noto Sans JP',sans-serif;appearance:none;}
+.btn-sm{padding:7px 12px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+.btn-sm.danger:hover{border-color:var(--danger);color:var(--danger);}
+
+/* Camera position: 2x2 grid for 4 options */
+.cam-positions{display:grid;grid-template-columns:repeat(2,1fr);}
+.cam-pos-btn{padding:10px 6px;background:transparent;border:none;border-right:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--muted);cursor:pointer;text-align:center;transition:all .2s;position:relative;}
+.cam-pos-btn:nth-child(2),.cam-pos-btn:nth-child(4){border-right:none;}
+.cam-pos-btn:nth-child(3),.cam-pos-btn:nth-child(4){border-bottom:none;}
+.cam-pos-btn .icon{display:block;font-size:16px;margin-bottom:3px;}
+.cam-pos-btn .label{display:block;font-size:11px;font-weight:500;line-height:1.3;}
+.cam-pos-btn .sublabel{display:block;font-size:10px;color:var(--muted);margin-top:1px;font-family:'Share Tech Mono',monospace;}
+.cam-pos-btn.active{background:rgba(0,229,255,.08);color:var(--accent);}
+.cam-pos-btn.active::after{content:'';position:absolute;inset:0;border:2px solid var(--accent);border-radius:0;pointer-events:none;}
+
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:10px;}
+.form-btn{padding:9px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;text-align:left;transition:all .2s;}
+.form-btn .name{display:block;font-size:12px;font-weight:500;color:var(--text);}
+.form-btn .offset{display:block;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
+.form-btn.active{background:rgba(255,107,53,.1);border-color:var(--accent2);}
+.form-btn.active .name{color:var(--accent2);}
+.distance-row{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);}
+.distance-row:last-child{border-bottom:none;}
+.dist-label{font-size:12px;color:var(--muted);}
+.dist-value{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);}
+.dist-note{font-size:10px;color:var(--muted);margin-top:1px;text-align:right;}
+
+/* Modal */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;}
+.modal-backdrop.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:300px;max-width:90vw;}
+.modal h3{font-size:15px;margin-bottom:14px;color:var(--accent);}
+.modal input,.modal select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px;font-size:14px;font-family:'Noto Sans JP',sans-serif;margin-bottom:12px;appearance:none;}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+.btn-primary{padding:8px 18px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-cancel{padding:8px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:13px;cursor:pointer;}
+
+/* Video */
+.video-list{list-style:none;display:flex;flex-direction:column;gap:8px;padding:12px;}
+.video-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.video-meta{display:flex;align-items:center;gap:10px;padding:10px 12px;}
+.video-thumb{width:60px;height:36px;background:#000;border-radius:4px;overflow:hidden;flex-shrink:0;}
+.video-thumb video{width:100%;height:100%;object-fit:cover;}
+.video-info{flex:1;min-width:0;}
+.video-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.video-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.video-spd{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;}
+.video-controls{padding:0 12px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.vc-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;}
+.vc-btn:hover{border-color:var(--accent);color:var(--accent);}
+.vc-btn.active{background:rgba(0,229,255,.1);border-color:var(--accent);color:var(--accent);}
+.vc-btn.assign{border-color:var(--accent2);color:var(--accent2);}
+.vc-btn.del:hover{border-color:var(--danger);color:var(--danger);}
+.video-player-wrap{display:none;padding:0 12px 10px;}
+.video-player-wrap video{width:100%;border-radius:6px;background:#000;}
+.rate-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;color:var(--muted);}
+.rate-bar{flex:1;height:3px;background:var(--border);border-radius:2px;}
+.rate-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .2s;}
+
+/* Pitcher page */
+.pitcher-list{list-style:none;display:flex;flex-direction:column;gap:6px;padding:12px;}
+.pitcher-card{display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;}
+.pitcher-avatar{width:36px;height:36px;background:var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.pitcher-name{font-size:14px;font-weight:500;flex:1;}
+.pitcher-stats{font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;margin-top:2px;}
+.empty-state{padding:28px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.9;}
+
+/* Reference page */
+.ref-section{margin:12px 14px 0;}
+.ref-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--accent);padding:10px 14px 6px;border-bottom:1px solid var(--border);background:var(--surface2);border-radius:8px 8px 0 0;}
+.ref-note{font-size:10px;color:var(--muted);padding:6px 14px 0;font-style:italic;}
+.ref-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden;}
+.ref-table th{background:var(--surface2);padding:8px 10px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-align:left;border-bottom:1px solid var(--border);}
+.ref-table td{padding:8px 10px;font-size:12px;border-bottom:1px solid var(--border);}
+.ref-table tr:last-child td{border-bottom:none;}
+.ref-table td:nth-child(2),.ref-table td:nth-child(3),.ref-table td:nth-child(4){font-family:'Share Tech Mono',monospace;font-size:11px;}
+.td-speed{color:var(--accent);}
+.td-warn{color:var(--warn);}
+.td-danger{color:var(--danger);}
+.td-muted{color:var(--muted);}
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;}
+.badge-green{background:rgba(57,255,20,.15);color:var(--green);}
+.badge-warn{background:rgba(245,196,24,.15);color:var(--warn);}
+.badge-danger{background:rgba(255,59,92,.15);color:var(--danger);}
+.badge-muted{background:rgba(107,122,153,.15);color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo">Pitch<span>Radar</span></div>
+  <div class="version">v6.0</div>
+</header>
+
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="showPage('measure',this)">⚾ 計測</button>
+  <button class="nav-tab" onclick="showPage('videos',this)">🎬 動画</button>
+  <button class="nav-tab" onclick="showPage('pitchers',this)">👤 投手</button>
+  <button class="nav-tab" onclick="showPage('reference',this)">📊 参考</button>
+</div>
+
+<!-- ===== MEASURE ===== -->
+<div id="page-measure" class="page active">
+
+  <div class="measure-top">
+    <button class="btn-measure state-release" id="btnMeasure" onclick="onMeasureTap()">
+      <span class="btn-icon">⚾</span>
+      <div><div>RELEASE</div><span class="btn-sub">リリースの瞬間にタップ</span></div>
+    </button>
+  </div>
+
+  <div class="elapsed-bar" id="elapsedBar">
+    <span class="elapsed-label">計測中...</span>
+    <span class="elapsed-val" id="elapsedVal">0.000s</span>
+  </div>
+
+  <div class="camera-section" id="cameraSection">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="corner-bracket tl"></div><div class="corner-bracket tr"></div>
+    <div class="corner-bracket bl"></div><div class="corner-bracket br"></div>
+    <div class="cam-label" id="camLabel">カメラ未起動</div>
+    <div class="cam-status" id="camStatus"><div class="dot"></div><span>STANDBY</span></div>
+    <div class="cam-placeholder" id="camPlaceholder">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6b7a99" stroke-width="1.5">
+        <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+      </svg>
+      <p>カメラは任意で起動できます<br>ボタンのみでも計測可能</p>
+    </div>
+  </div>
+
+  <div class="cam-toggle-bar">
+    <button class="btn-cam btn-cam-start" id="btnCamStart" onclick="startCamera()">📷 カメラ起動</button>
+    <button class="btn-cam btn-cam-stop" id="btnCamStop" onclick="stopCamera()">■ カメラ停止</button>
+  </div>
+
+  <div class="speed-board">
+    <div class="speed-main">
+      <div class="speed-number" id="speedNumber">- - -</div>
+      <div class="speed-unit">km/h</div>
+    </div>
+    <div class="speed-meta">
+      <div class="smi"><span class="smi-label">飛行時間</span><span class="smi-value" id="smTime">—</span></div>
+      <div class="smi"><span class="smi-label">飛行距離</span><span class="smi-value" id="smDist">—</span></div>
+      <div class="smi"><span class="smi-label">投手</span><span class="smi-value" id="smPitcher">—</span></div>
+    </div>
+  </div>
+
+  <div class="history-wrap" id="historyWrap" style="display:none">
+    <div class="history-header">
+      <span>履歴</span>
+      <span class="history-stats" id="histStats"></span>
+    </div>
+    <ul class="history-list" id="historyList"></ul>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">投手選択</div>
+    <div class="pitcher-bar">
+      <select id="pitcherSelect" class="pitcher-select"><option value="">-- 投手を選択 --</option></select>
+      <button class="btn-sm" onclick="openAddPitcher()">＋追加</button>
+    </div>
+  </div>
+
+  <!-- カメラ位置：4択 2×2 -->
+  <div class="panel">
+    <div class="panel-header">カメラ位置</div>
+    <div class="cam-positions">
+      <button class="cam-pos-btn active" data-pos="tip" onclick="selectPosition(this)">
+        <span class="icon">🏟</span>
+        <span class="label">後方角</span>
+        <span class="sublabel">+0.43m</span>
+      </button>
+      <button class="cam-pos-btn" data-pos="catcher" onclick="selectPosition(this)">
+        <span class="icon">🧤</span>
+        <span class="label">キャッチャー</span>
+        <span class="sublabel">+1.11m</span>
+      </button>
+      <button class="cam-pos-btn" data-pos="catcher_back" onclick="selectPosition(this)">
+        <span class="icon">🧤</span>
+        <span class="label">素人キャッチャー<br>（後方）</span>
+        <span class="sublabel">+1.51m</span>
+      </button>
+      <button class="cam-pos-btn" data-pos="umpire" onclick="selectPosition(this)">
+        <span class="icon">⚾</span>
+        <span class="label">主審</span>
+        <span class="sublabel">+1.91m</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">投法</div>
+    <div class="form-grid">
+      <button class="form-btn active" data-form="over" onclick="selectForm(this)">
+        <span class="name">オーバースロー</span><span class="offset">リリース −1.90m</span>
+      </button>
+      <button class="form-btn" data-form="three" onclick="selectForm(this)">
+        <span class="name">スリークォーター</span><span class="offset">リリース −1.70m</span>
+      </button>
+      <button class="form-btn" data-form="side" onclick="selectForm(this)">
+        <span class="name">サイドスロー</span><span class="offset">リリース −1.50m</span>
+      </button>
+      <button class="form-btn" data-form="under" onclick="selectForm(this)">
+        <span class="name">アンダースロー</span><span class="offset">リリース −1.30m</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">計算パラメータ</div>
+    <div class="distance-row">
+      <div class="dist-label">公式距離（投手板前縁〜ベース前端）</div>
+      <div class="dist-value">18.44 m</div>
+    </div>
+    <div class="distance-row">
+      <div class="dist-label">カメラ位置補正</div>
+      <div style="text-align:right">
+        <div class="dist-value" id="camOffset">+0.43 m</div>
+        <div class="dist-note" id="camNote">ホームベース後方角</div>
+      </div>
+    </div>
+    <div class="distance-row">
+      <div class="dist-label">リリース前方補正</div>
+      <div class="dist-value" id="releaseOffset">−1.90 m</div>
+    </div>
+    <div class="distance-row" style="background:rgba(0,229,255,.04)">
+      <div class="dist-label" style="color:var(--text);font-weight:700;">推定飛行距離（3D）</div>
+      <div class="dist-value" id="flightDist" style="font-size:16px;">17.05 m</div>
+    </div>
+  </div>
+  <div style="height:16px"></div>
+</div>
+
+<!-- ===== VIDEOS ===== -->
+<div id="page-videos" class="page">
+  <div class="panel" style="margin-top:14px">
+    <div class="panel-header">保存動画</div>
+    <ul class="video-list" id="videoList">
+      <li class="empty-state">保存された動画はありません<br>カメラ起動中に計測すると自動保存されます</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== PITCHERS ===== -->
+<div id="page-pitchers" class="page">
+  <div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:13px;color:var(--muted);">登録投手</div>
+    <button class="btn-sm" onclick="openAddPitcher()">＋投手追加</button>
+  </div>
+  <ul class="pitcher-list" id="pitcherListPage">
+    <li class="empty-state">投手が登録されていません</li>
+  </ul>
+</div>
+
+<!-- ===== REFERENCE ===== -->
+<div id="page-reference" class="page">
+
+  <!-- 表1: 誤差試算 -->
+  <div class="ref-section">
+    <div class="ref-title">⏱ タップ誤差と球速への影響</div>
+    <p class="ref-note">飛行距離17m（後方角・オーバースロー）で試算。0.1秒ズレた場合。</p>
+    <table class="ref-table">
+      <tr><th>実際の球速</th><th>正確な飛行時間</th><th>0.1秒遅い場合</th><th>誤差</th></tr>
+      <tr><td>150 km/h</td><td class="td-speed">0.408s</td><td class="td-danger">120 km/h</td><td class="td-danger">−30 km/h</td></tr>
+      <tr><td>130 km/h</td><td class="td-speed">0.471s</td><td class="td-warn">107 km/h</td><td class="td-warn">−23 km/h</td></tr>
+      <tr><td>110 km/h</td><td class="td-speed">0.556s</td><td class="td-warn">93 km/h</td><td class="td-warn">−17 km/h</td></tr>
+      <tr><td>80 km/h</td><td class="td-speed">0.765s</td><td class="td-muted">71 km/h</td><td class="td-muted">−9 km/h</td></tr>
+    </table>
+  </div>
+
+  <!-- 表2: レベル別球速目安 -->
+  <div class="ref-section">
+    <div class="ref-title">⚾ 軟式野球 レベル別球速目安</div>
+    <p class="ref-note">草野球リーグ区分および一般的な目安。</p>
+    <table class="ref-table">
+      <tr><th>レベル</th><th>球速目安</th><th>評価</th></tr>
+      <tr><td>野球未経験・一般男性</td><td class="td-muted">70〜90 km/h</td><td><span class="badge badge-muted">入門</span></td></tr>
+      <tr><td>草野球Cリーグ（初心者含む）</td><td class="td-speed">90〜100 km/h</td><td><span class="badge badge-muted">初級</span></td></tr>
+      <tr><td>草野球Bリーグ（高校経験者）</td><td class="td-speed">平均110 km/h</td><td><span class="badge badge-green">中級</span></td></tr>
+      <tr><td>草野球Aリーグ（大学経験者）</td><td class="td-warn">平均120 km/h</td><td><span class="badge badge-warn">上級</span></td></tr>
+      <tr><td>草野球トップ（強豪チーム）</td><td class="td-danger">130 km/h以上</td><td><span class="badge badge-danger">エース級</span></td></tr>
+    </table>
+  </div>
+
+  <!-- 表3: 風切り音 -->
+  <div class="ref-section" style="margin-bottom:16px">
+    <div class="ref-title">🌬 バッター位置での風切り音の目安</div>
+    <p class="ref-note">ホームベース付近通過時の体感。無風・静音環境での参考値。</p>
+    <table class="ref-table">
+      <tr><th>リリース球速</th><th>通過時推定速度</th><th>風切り音</th></tr>
+      <tr><td>80 km/h以下</td><td class="td-muted">70 km/h前後</td><td class="td-muted">ほぼ聞こえない</td></tr>
+      <tr><td>90〜100 km/h</td><td class="td-speed">80 km/h前後</td><td class="td-speed">かすかに聞こえる</td></tr>
+      <tr><td>110〜120 km/h</td><td class="td-warn">95〜105 km/h</td><td class="td-warn">はっきり聞こえ始める ★</td></tr>
+      <tr><td>130 km/h以上</td><td class="td-danger">110 km/h以上</td><td class="td-danger">明確に聞こえる</td></tr>
+    </table>
+    <p style="font-size:10px;color:var(--muted);padding:8px 14px;">★ 風切り音の境界線はおよそ110〜120 km/hと推定。ミットの音・風向き・個人差により変動します。</p>
+  </div>
+
+</div>
+
+</div><!-- .app -->
+
+<!-- ADD PITCHER MODAL -->
+<div class="modal-backdrop" id="addPitcherModal">
+  <div class="modal">
+    <h3>投手を追加</h3>
+    <input type="text" id="newPitcherName" placeholder="投手名を入力" maxlength="20">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('addPitcherModal')">キャンセル</button>
+      <button class="btn-primary" onclick="confirmAddPitcher()">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN PITCHER MODAL -->
+<div class="modal-backdrop" id="assignPitcherModal">
+  <div class="modal">
+    <h3>投手を割り当て</h3>
+    <select id="assignSelect" style="margin-bottom:12px"></select>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('assignPitcherModal')">キャンセル</button>
+      <button class="btn-primary" onclick="confirmAssign()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_DIST = 18.44;
+const POSITIONS = {
+  tip:          {name:'ホームベース後方角',       camOffset:0.43,  note:'ベース奥行0.43m'},
+  catcher:      {name:'キャッチャー位置',          camOffset:1.11,  note:'後方角から+0.68m'},
+  catcher_back: {name:'素人キャッチャー（後方）',  camOffset:1.51,  note:'通常より約0.40m後方'},
+  umpire:       {name:'主審位置',                  camOffset:1.91,  note:'キャッチャーから+0.40m'},
+};
+const FORMS = {
+  over:  {name:'オーバースロー',  frontOffset:1.90, height:2.00},
+  three: {name:'スリークォーター',frontOffset:1.70, height:1.80},
+  side:  {name:'サイドスロー',    frontOffset:1.50, height:1.40},
+  under: {name:'アンダースロー',  frontOffset:1.30, height:1.00},
+};
+
+let currentForm = 'over', currentPos = 'tip';
+let cameraStream = null, mediaRecorder = null, recordedChunks = [];
+let measurePhase = 1, t1 = 0, timerRAF = null;
+let sessionHistory = [];
+let pitchers = JSON.parse(localStorage.getItem('pr_pitchers') || '[]');
+let savedVideos = [];
+let assignTargetId = null;
+
+function showPage(id, tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if (tab) tab.classList.add('active');
+  if (id === 'pitchers') renderPitcherPage();
+  if (id === 'videos')   renderVideoList();
+}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function savePitchers() { localStorage.setItem('pr_pitchers', JSON.stringify(pitchers)); }
+function openAddPitcher() {
+  document.getElementById('newPitcherName').value = '';
+  openModal('addPitcherModal');
+  setTimeout(() => document.getElementById('newPitcherName').focus(), 100);
+}
+document.getElementById('newPitcherName').addEventListener('keydown', e => { if(e.key==='Enter') confirmAddPitcher(); });
+function confirmAddPitcher() {
+  const name = document.getElementById('newPitcherName').value.trim();
+  if (!name) return;
+  const id = Date.now().toString();
+  pitchers.push({id, name, records:[]});
+  savePitchers(); renderPitcherSelect(); renderPitcherPage();
+  closeModal('addPitcherModal');
+  document.getElementById('pitcherSelect').value = id;
+}
+function deletePitcher(id) {
+  if (!confirm('この投手のデータを削除しますか？')) return;
+  pitchers = pitchers.filter(p => p.id !== id);
+  savePitchers(); renderPitcherSelect(); renderPitcherPage();
+}
+function renderPitcherSelect() {
+  const sel = document.getElementById('pitcherSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- 投手を選択 --</option>';
+  pitchers.forEach(p => { const o = document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); });
+  sel.value = cur;
+}
+function renderPitcherPage() {
+  const ul = document.getElementById('pitcherListPage');
+  if (!pitchers.length) { ul.innerHTML='<li class="empty-state">投手が登録されていません</li>'; return; }
+  ul.innerHTML = '';
+  pitchers.forEach(p => {
+    const recs=p.records||[], speeds=recs.map(r=>r.kmh);
+    const maxS=speeds.length?Math.max(...speeds).toFixed(1):'—';
+    const avgS=speeds.length?(speeds.reduce((a,b)=>a+b,0)/speeds.length).toFixed(1):'—';
+    const li=document.createElement('li'); li.className='pitcher-card';
+    li.innerHTML=`<div class="pitcher-avatar">⚾</div><div style="flex:1"><div class="pitcher-name">${p.name}</div><div class="pitcher-stats">計${recs.length}球 MAX:${maxS} AVG:${avgS} km/h</div></div><button class="btn-sm danger" onclick="deletePitcher('${p.id}')">削除</button>`;
+    ul.appendChild(li);
+  });
+}
+
+function getFlightDist() {
+  const pos=POSITIONS[currentPos], form=FORMS[currentForm];
+  const h=BASE_DIST+pos.camOffset-form.frontOffset;
+  return {dist3d:Math.sqrt(h*h+form.height*form.height)};
+}
+function calcSpeed(ms) {
+  const d=getFlightDist(), sec=ms/1000;
+  return {kmh:Math.round((d.dist3d/sec)*3.6*10)/10, sec, dist:d.dist3d};
+}
+function updateDistDisplay() {
+  const pos=POSITIONS[currentPos], form=FORMS[currentForm], d=getFlightDist();
+  document.getElementById('camOffset').textContent='+'+pos.camOffset.toFixed(2)+' m';
+  document.getElementById('camNote').textContent=pos.note;
+  document.getElementById('releaseOffset').textContent='−'+form.frontOffset.toFixed(2)+' m';
+  document.getElementById('flightDist').textContent=d.dist3d.toFixed(2)+' m';
+}
+function selectPosition(btn) {
+  document.querySelectorAll('.cam-pos-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); currentPos=btn.dataset.pos; updateDistDisplay();
+  if (cameraStream) document.getElementById('camLabel').textContent=POSITIONS[currentPos].name+' から撮影中';
+}
+function selectForm(btn) {
+  document.querySelectorAll('.form-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); currentForm=btn.dataset.form; updateDistDisplay();
+}
+
+async function startCamera() {
+  try {
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:60,min:30}},audio:false});
+    const vid=document.getElementById('video'); vid.srcObject=cameraStream; await vid.play();
+    document.getElementById('camPlaceholder').style.display='none';
+    document.getElementById('camStatus').className='cam-status live';
+    document.getElementById('camStatus').innerHTML='<div class="dot"></div><span>REC</span>';
+    document.getElementById('camLabel').textContent=POSITIONS[currentPos].name+' から撮影中';
+    document.getElementById('btnCamStart').style.display='none';
+    document.getElementById('btnCamStop').style.display='block';
+    startRecording();
+  } catch(e) { alert('カメラにアクセスできませんでした。\nHTTPSでアクセスしているか確認してください。\n\n'+e.message); }
+}
+function stopCamera() {
+  if (mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  if (cameraStream) { cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+  document.getElementById('video').srcObject=null;
+  document.getElementById('camPlaceholder').style.display='flex';
+  document.getElementById('camStatus').className='cam-status';
+  document.getElementById('camStatus').innerHTML='<div class="dot"></div><span>STANDBY</span>';
+  document.getElementById('camLabel').textContent='カメラ未起動';
+  document.getElementById('btnCamStart').style.display='block';
+  document.getElementById('btnCamStop').style.display='none';
+}
+
+function setMeasureUI(state) {
+  const btn=document.getElementById('btnMeasure');
+  btn.className='btn-measure state-'+state;
+  if (state==='release') {
+    btn.innerHTML=`<span class="btn-icon">⚾</span><div><div>RELEASE</div><span class="btn-sub">リリースの瞬間にタップ</span></div>`;
+    measurePhase=1;
+  } else {
+    btn.innerHTML=`<span class="btn-icon">🧤</span><div><div>CATCH</div><span class="btn-sub">捕球の瞬間にタップ</span></div>`;
+    measurePhase=2;
+  }
+}
+function onMeasureTap() {
+  if (measurePhase===1) {
+    t1=performance.now(); flash('green'); setMeasureUI('catch');
+    document.getElementById('elapsedBar').classList.add('visible'); startElapsed();
+  } else if (measurePhase===2) {
+    const t2=performance.now(); flash('red');
+    if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF=null; }
+    document.getElementById('elapsedBar').classList.remove('visible');
+    const ms=t2-t1;
+    if (ms<150||ms>3000) { alert('測定値が範囲外です（'+ms.toFixed(0)+'ms）\nもう一度お試しください。'); setMeasureUI('release'); return; }
+    const result=calcSpeed(ms); showResult(result);
+    if (cameraStream) stopRecordingAndSave(result);
+    setTimeout(()=>setMeasureUI('release'), 1200);
+  }
+}
+function flash(color) {
+  const btn=document.getElementById('btnMeasure');
+  const div=document.createElement('div'); div.className='flash-'+color;
+  btn.appendChild(div); setTimeout(()=>div.remove(), 350);
+}
+function startElapsed() {
+  const s=performance.now();
+  function tick() { document.getElementById('elapsedVal').textContent=((performance.now()-s)/1000).toFixed(3)+'s'; timerRAF=requestAnimationFrame(tick); }
+  tick();
+}
+
+function startRecording() {
+  recordedChunks=[];
+  const mime=['video/webm;codecs=vp9','video/webm','video/mp4'].find(m=>{try{return MediaRecorder.isTypeSupported(m);}catch(e){return false;}})||'';
+  try { mediaRecorder=new MediaRecorder(cameraStream,mime?{mimeType:mime,videoBitsPerSecond:4000000}:{}); mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordedChunks.push(e.data);}; mediaRecorder.start(100); } catch(e) { mediaRecorder=null; }
+}
+function stopRecordingAndSave(result) {
+  if (!mediaRecorder||mediaRecorder.state==='inactive') { startRecording(); return; }
+  mediaRecorder.onstop=()=>{
+    const blob=new Blob(recordedChunks,{type:mediaRecorder.mimeType||'video/webm'});
+    if (blob.size>50000) {
+      const url=URL.createObjectURL(blob);
+      const pitcherId=document.getElementById('pitcherSelect').value;
+      const pitcher=pitchers.find(p=>p.id===pitcherId);
+      savedVideos.unshift({id:Date.now().toString(),url,kmh:result.kmh,sec:result.sec,dist:result.dist,pitcherId:pitcherId||'',pitcherName:pitcher?pitcher.name:'未割当',form:FORMS[currentForm].name,pos:POSITIONS[currentPos].name,date:new Date().toLocaleString('ja-JP')});
+      if (savedVideos.length>30) { URL.revokeObjectURL(savedVideos[savedVideos.length-1].url); savedVideos.pop(); }
+    }
+    startRecording();
+  };
+  mediaRecorder.stop();
+}
+
+function showResult(result) {
+  const kmh=result.kmh, el=document.getElementById('speedNumber');
+  el.textContent=Math.round(kmh); el.className='speed-number'+(kmh>=140?' very-fast':kmh>=120?' fast':'');
+  document.getElementById('smTime').textContent=result.sec.toFixed(3)+'s';
+  document.getElementById('smDist').textContent=result.dist.toFixed(2)+'m';
+  const pitcherId=document.getElementById('pitcherSelect').value;
+  const pitcher=pitchers.find(p=>p.id===pitcherId);
+  document.getElementById('smPitcher').textContent=pitcher?pitcher.name:'未選択';
+  addHistory(result,pitcher);
+  if (pitcher) {
+    pitcher.records=pitcher.records||[];
+    pitcher.records.unshift({kmh,sec:result.sec,form:currentForm,pos:currentPos,date:new Date().toISOString()});
+    if (pitcher.records.length>200) pitcher.records=pitcher.records.slice(0,200);
+    savePitchers();
+  }
+}
+function addHistory(result,pitcher) {
+  const time=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  sessionHistory.unshift({...result,time,pitcherName:pitcher?pitcher.name:'未選択'});
+  const li=document.createElement('li'); li.className='history-item';
+  const kmh=result.kmh, cls=kmh>=140?'very-fast':kmh>=120?'fast':'';
+  li.innerHTML=`<div class="h-num">#${sessionHistory.length}</div><div><div class="h-speed ${cls}">${Math.round(kmh)}</div><div class="h-kmh">km/h</div></div><div class="h-info">${pitcher?pitcher.name:'未選択'} / ${FORMS[currentForm].name}</div><div class="h-time">${time}</div>`;
+  const list=document.getElementById('historyList');
+  list.insertBefore(li,list.firstChild);
+  document.getElementById('historyWrap').style.display='block';
+  const speeds=sessionHistory.map(h=>h.kmh);
+  document.getElementById('histStats').textContent='MAX '+Math.max(...speeds).toFixed(1)+' / AVG '+(speeds.reduce((a,b)=>a+b,0)/speeds.length).toFixed(1)+' km/h';
+}
+
+function renderVideoList() {
+  const ul=document.getElementById('videoList');
+  if (!savedVideos.length) { ul.innerHTML='<li class="empty-state">保存された動画はありません<br>カメラ起動中に計測すると自動保存されます</li>'; return; }
+  ul.innerHTML='';
+  savedVideos.forEach(v=>{
+    const li=document.createElement('li'); li.className='video-item';
+    const spdColor=v.kmh>=140?'var(--danger)':v.kmh>=120?'var(--accent2)':'var(--accent)';
+    li.innerHTML=`<div class="video-meta"><div class="video-thumb"><video src="${v.url}" muted preload="metadata"></video></div><div class="video-info"><div class="video-title">${v.pitcherName} — ${Math.round(v.kmh)} km/h</div><div class="video-sub">${v.form} | ${v.pos}</div><div class="video-sub">${v.date}</div></div><div style="text-align:right"><div class="video-spd" style="color:${spdColor}">${Math.round(v.kmh)}</div><div style="font-size:10px;color:var(--muted)">km/h</div></div></div><div class="video-controls"><button class="vc-btn" onclick="togglePlayer('${v.id}')">▶ 再生</button><button class="vc-btn" id="r100-${v.id}" onclick="setRate('${v.id}',1.0)">等速</button><button class="vc-btn active" id="r050-${v.id}" onclick="setRate('${v.id}',0.5)">1/2</button><button class="vc-btn" id="r025-${v.id}" onclick="setRate('${v.id}',0.25)">1/4</button><button class="vc-btn assign" onclick="openAssign('${v.id}')">投手変更</button><button class="vc-btn del" onclick="deleteVideo('${v.id}')">削除</button></div><div class="video-player-wrap" id="vwrap-${v.id}"><video id="vid-${v.id}" src="${v.url}" controls playsinline preload="metadata"></video><div class="rate-row"><span>再生速度:</span><div class="rate-bar"><div class="rate-fill" id="rfill-${v.id}" style="width:50%"></div></div><span id="rlabel-${v.id}">0.5x</span></div></div>`;
+    ul.appendChild(li);
+  });
+}
+function togglePlayer(id) {
+  const wrap=document.getElementById('vwrap-'+id), vid=document.getElementById('vid-'+id);
+  if (wrap.style.display==='block') { wrap.style.display='none'; vid.pause(); }
+  else { wrap.style.display='block'; vid.playbackRate=0.5; vid.play(); }
+}
+function setRate(id,rate) {
+  const vid=document.getElementById('vid-'+id); if(vid) vid.playbackRate=rate;
+  const fill=document.getElementById('rfill-'+id); if(fill) fill.style.width=(rate*100)+'%';
+  const lbl=document.getElementById('rlabel-'+id); if(lbl) lbl.textContent=rate+'x';
+  ['r100','r050','r025'].forEach(k=>{const b=document.getElementById(k+'-'+id);if(b)b.classList.remove('active');});
+  const map={'1':'r100','0.5':'r050','0.25':'r025'}, k=map[String(rate)];
+  if(k){const b=document.getElementById(k+'-'+id);if(b)b.classList.add('active');}
+}
+function deleteVideo(id) {
+  if (!confirm('この動画を削除しますか？')) return;
+  const idx=savedVideos.findIndex(v=>v.id===id);
+  if(idx!==-1){URL.revokeObjectURL(savedVideos[idx].url);savedVideos.splice(idx,1);}
+  renderVideoList();
+}
+function openAssign(videoId) {
+  assignTargetId=videoId;
+  const sel=document.getElementById('assignSelect');
+  sel.innerHTML='<option value="">未割当</option>';
+  pitchers.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+  const v=savedVideos.find(v=>v.id===videoId); if(v) sel.value=v.pitcherId||'';
+  openModal('assignPitcherModal');
+}
+function confirmAssign() {
+  const sel=document.getElementById('assignSelect'), pitcherId=sel.value;
+  const pitcher=pitchers.find(p=>p.id===pitcherId);
+  const v=savedVideos.find(v=>v.id===assignTargetId);
+  if(v){v.pitcherId=pitcherId;v.pitcherName=pitcher?pitcher.name:'未割当';}
+  closeModal('assignPitcherModal'); renderVideoList();
+}
+
+renderPitcherSelect();
+updateDistDisplay();
+</script>
+</body>
+</html>
